@@ -1,10 +1,6 @@
 package typesense30142
 
-import (
-	"encoding/json"
-
-	"github.com/nbd-wtf/go-nostr"
-)
+import "github.com/nbd-wtf/go-nostr"
 
 // BaseEntity contains common fields used across many entity types
 type BaseEntity struct {
@@ -45,7 +41,8 @@ type Creator struct {
 // Contributor represents someone who contributed to the content
 type Contributor struct {
 	BaseEntity
-	HonoricPrefix string `json:"honoricPrefix,omitempty"`
+	Affiliation   *Affiliation `json:"affiliation,omitempty"`
+	HonoricPrefix string       `json:"honoricPrefix,omitempty"`
 }
 
 // Publisher represents the publisher of the content
@@ -80,23 +77,17 @@ type Audience struct {
 
 // Teaches represents what the content teaches
 type Teaches struct {
-	ID string `json:"id"`
-	LabeledEntity
-	LanguageEntity
+  ControlledVocabulary
 }
 
 // Assesses represents what the content assesses
 type Assesses struct {
-	ID string `json:"id"`
-	LabeledEntity
-	LanguageEntity
+  ControlledVocabulary
 }
 
 // CompetencyRequired represents required competencies
 type CompetencyRequired struct {
-	ID string `json:"id"`
-	LabeledEntity
-	LanguageEntity
+  ControlledVocabulary
 }
 
 // EducationalLevel represents the educational level
@@ -111,6 +102,7 @@ type InteractivityType struct {
 
 // IsBasedOn represents a reference to source material
 type IsBasedOn struct {
+  ID string `json:"id"`
 	Type    string   `json:"type,omitempty"`
 	Name    string   `json:"name"`
 	Creator *Creator `json:"creator,omitempty"`
@@ -156,11 +148,11 @@ type NostrMetadata struct {
 
 // AMBMetadata represents the full metadata structure
 type AMBMetadata struct {
-  // Event ID
-	ID          string     `json:"id"`
+	// Event ID
+	ID string `json:"id"`
 	// Document ID
 	D           string     `json:"d"`
-	Type        string     `json:"type"`
+	Type        []string   `json:"type"`
 	Name        string     `json:"name"`
 	Description string     `json:"description,omitempty"`
 	About       []*About   `json:"about,omitempty"`
@@ -205,124 +197,3 @@ type AMBMetadata struct {
 	// Nostr integration
 	NostrMetadata `json:",inline"`
 }
-
-// converts a nostr event to stringified JSON
-func eventToStringifiedJSON(event *nostr.Event) (string, error) {
-	jsonData, err := json.Marshal(event)
-	if err != nil {
-		return "", err
-	}
-
-	jsonString := string(jsonData)
-	return jsonString, err
-}
-
-// NostrToAMB converts a Nostr event of kind 30142 to AMB metadata
-func NostrToAMB(event *nostr.Event) (*AMBMetadata, error) {
-	eventRaw, _ := eventToStringifiedJSON(event)
-
-	amb := &AMBMetadata{
-		Type: "LearningResource",
-		NostrMetadata: NostrMetadata{
-			EventID:        event.ID,
-			EventPubKey:    event.PubKey,
-			EventContent:   event.Content,
-			EventCreatedAt: event.CreatedAt,
-			EventKind:      event.Kind,
-			EventSig:       event.Sig,
-			EventRaw:       eventRaw,
-		},
-	}
-
-	for _, tag := range event.Tags {
-		if len(tag) < 2 {
-			continue
-		}
-
-		// TODO alle Attribute durchgehen für das parsen
-		switch tag[0] {
-		case "d":
-			if len(tag) >= 2 {
-				amb.ID = event.ID
-        amb.D = tag[1]
-			}
-		case "name":
-			if len(tag) >= 2 {
-				amb.Name = tag[1]
-			}
-		case "description":
-			if len(tag) >= 2 {
-				amb.Description = tag[1]
-			}
-		case "creator":
-			if len(tag) >= 2 {
-				creator := &Creator{}
-				creator.Name = tag[1]
-				if len(tag) >= 3 {
-					creator.ID = tag[2]
-				}
-				if len(tag) >= 4 {
-					creator.Type = tag[3]
-				}
-
-				amb.Creator = append(amb.Creator, creator)
-			}
-		case "image":
-			if len(tag) >= 2 {
-				amb.Image = tag[1]
-			}
-		case "about":
-			if len(tag) >= 3 {
-				subject := &About{}
-				subject.PrefLabel = tag[1]
-				subject.InLanguage = tag[2]
-				if len(tag) >= 4 {
-					subject.ID = tag[3]
-				}
-				amb.About = append(amb.About, subject)
-			}
-		case "learningResourceType":
-			if len(tag) >= 3 {
-				lrt := &LearningResourceType{}
-				lrt.PrefLabel = tag[1]
-				lrt.InLanguage = tag[2]
-				if len(tag) >= 4 {
-					lrt.ID = tag[3]
-				}
-				amb.LearningResourceType = append(amb.LearningResourceType, lrt)
-			}
-		case "inLanguage":
-			if len(tag) >= 2 {
-				amb.InLanguage = append(amb.InLanguage, tag[1])
-			}
-		case "keywords":
-			if len(tag) >= 2 {
-				amb.Keywords = tag[1:]
-			}
-		case "license":
-			if len(tag) >= 3 {
-				amb.License = &License{}
-				amb.License.ID = tag[1]
-				amb.License.Name = tag[2]
-
-			}
-		case "datePublished":
-			if len(tag) >= 2 {
-				amb.DatePublished = tag[1]
-			}
-		}
-	}
-
-	return amb, nil
-}
-
-// converts a stringified JSON event to a nostr.Event
-func StringifiedJSONToNostrEvent(jsonString string) (nostr.Event, error) {
-	var event nostr.Event
-	err := json.Unmarshal([]byte(jsonString), &event)
-	if err != nil {
-		return nostr.Event{}, err
-	}
-	return event, nil
-}
-

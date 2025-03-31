@@ -32,6 +32,48 @@ func (ts *TSBackend) QueryEvents(ctx context.Context, filter nostr.Filter) (chan
 	return ch, nil
 }
 
+// SearchResources searches for resources and returns both the AMB metadata and converted Nostr events
+func (ts *TSBackend) SearchResources(searchStr string) ([]nostr.Event, error) {
+	parsedQuery := ParseSearchQuery(searchStr)
+
+	mainQuery, params, err := BuildTypesenseQuery(parsedQuery)
+	if err != nil {
+		return nil, fmt.Errorf("error building Typesense query: %v", err)
+	}
+
+	// URL encode the main query
+	encodedQuery := url.QueryEscape(mainQuery)
+
+	// Default fields to search in
+	queryBy := "name,description"
+
+	// Start building the search URL
+	searchURL := fmt.Sprintf("%s/collections/%s/documents/search?q=%s&query_by=%s",
+		ts.Host, ts.CollectionName, encodedQuery, queryBy)
+
+	// Add additional parameters
+	for key, value := range params {
+		searchURL += fmt.Sprintf("&%s=%s", key, url.QueryEscape(value))
+	}
+
+	// Debug information
+	fmt.Printf("Search URL: %s\n", searchURL)
+
+	resp, err := ts.makehttpRequest(searchURL, http.MethodGet, nil)
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("error reading response body: %v", err)
+	}
+
+	// Check for errors
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("search failed with status code %d: %s", resp.StatusCode, string(body))
+	}
+
+	return parseSearchResponse(body)
+}
+
 // SearchQuery represents a parsed search query with raw terms and field filters
 type SearchQuery struct {
 	RawTerms     []string
@@ -107,48 +149,6 @@ func BuildTypesenseQuery(query SearchQuery) (string, map[string]string, error) {
 	}
 
 	return mainQuery, params, nil
-}
-
-// SearchResources searches for resources and returns both the AMB metadata and converted Nostr events
-func (ts *TSBackend) SearchResources(searchStr string) ([]nostr.Event, error) {
-	parsedQuery := ParseSearchQuery(searchStr)
-
-	mainQuery, params, err := BuildTypesenseQuery(parsedQuery)
-	if err != nil {
-		return nil, fmt.Errorf("error building Typesense query: %v", err)
-	}
-
-	// URL encode the main query
-	encodedQuery := url.QueryEscape(mainQuery)
-
-	// Default fields to search in
-	queryBy := "name,description"
-
-	// Start building the search URL
-	searchURL := fmt.Sprintf("%s/collections/%s/documents/search?q=%s&query_by=%s",
-		ts.Host, ts.CollectionName, encodedQuery, queryBy)
-
-	// Add additional parameters
-	for key, value := range params {
-		searchURL += fmt.Sprintf("&%s=%s", key, url.QueryEscape(value))
-	}
-
-	// Debug information
-	fmt.Printf("Search URL: %s\n", searchURL)
-
-	resp, err := ts.makehttpRequest(searchURL, http.MethodGet, nil)
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("error reading response body: %v", err)
-	}
-
-	// Check for errors
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("search failed with status code %d: %s", resp.StatusCode, string(body))
-	}
-
-	return parseSearchResponse(body)
 }
 
 func parseSearchResponse(responseBody []byte) ([]nostr.Event, error) {
