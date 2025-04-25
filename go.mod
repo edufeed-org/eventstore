@@ -1,4 +1,4 @@
-module github.com/sroertgen/eventstore
+module github.com/edufeed-org/eventstore
 
 go 1.24.1
 
