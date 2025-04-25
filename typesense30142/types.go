@@ -152,7 +152,7 @@ type AMBMetadata struct {
 	ID string `json:"id"`
 	// Document ID
 	D           string     `json:"d"`
-	Type        []string   `json:"type"`
+	Type        []string   `json:"type,omitempty"`
 	Name        string     `json:"name"`
 	Description string     `json:"description,omitempty"`
 	About       []*About   `json:"about,omitempty"`

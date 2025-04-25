@@ -55,7 +55,7 @@ func (ts *TSBackend) CheckOrCreateCollection() error {
 func (ts *TSBackend) collectionExists() (bool, error) {
 	url := fmt.Sprintf("%s/collections/%s", ts.Host, ts.CollectionName)
 
-	resp, err := ts.makehttpRequest(url, http.MethodGet, nil)
+	resp, body, err := ts.makehttpRequest(url, http.MethodGet, nil)
 	if err != nil {
 		return false, err
 	}
@@ -66,7 +66,6 @@ func (ts *TSBackend) collectionExists() (bool, error) {
 
 	// Any status code other than 200 is an error
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
 		return false, fmt.Errorf("unexpected status code: %d, body: %s", resp.StatusCode, string(body))
 	}
 
@@ -81,7 +80,7 @@ func (ts *TSBackend) createCollection(name string) error {
 			// Base information
 			{Name: "id", Type: "string"},
 			{Name: "d", Type: "string"},
-			{Name: "type", Type: "string"},
+			{Name: "type", Type: "string[]"},
 			{Name: "name", Type: "string"},
 			{Name: "description", Type: "string", Optional: true},
 			{Name: "about", Type: "object[]", Optional: true},
@@ -141,34 +140,40 @@ func (ts *TSBackend) createCollection(name string) error {
 		return err
 	}
 
-	resp, err := ts.makehttpRequest(url, http.MethodPost, jsonData)
+	resp, body, err := ts.makehttpRequest(url, http.MethodPost, jsonData)
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
-		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("failed to create collection, status: %d, body: %s", resp.StatusCode, string(body))
 	}
 
 	return nil
 }
 
-// Makes an http request to typesense
-func (ts *TSBackend) makehttpRequest(url string, method string, reqBody []byte) (*http.Response, error) {
-	req, err := http.NewRequest(method, url, bytes.NewBuffer(reqBody))
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Set("X-TYPESENSE-API-KEY", ts.ApiKey)
-	req.Header.Set("Content-Type", "application/json")
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	return resp, nil
+func (ts *TSBackend) makehttpRequest(url string, method string, jsonData []byte) (*http.Response, []byte, error) {
+    // Create request
+    req, err := http.NewRequest(method, url, bytes.NewBuffer(jsonData))
+    if err != nil {
+        return nil, nil, err
+    }
+    
+    req.Header.Set("X-TYPESENSE-API-KEY", ts.ApiKey)
+    req.Header.Set("Content-Type", "application/json")
+    
+    // Execute request
+    client := &http.Client{}
+    resp, err := client.Do(req)
+    if err != nil {
+        return nil, nil, err
+    }
+    defer resp.Body.Close()
+    
+    // Read body
+    body, err := io.ReadAll(resp.Body)
+    if err != nil {
+        return resp, nil, err
+    }
+    
+    return resp, body, nil
 }
 
 // TODO Count events

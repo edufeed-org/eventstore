@@ -1,1 +1,2 @@
-// "hello learningResourceType.prefLabel:bla"
+package typesense30142
+

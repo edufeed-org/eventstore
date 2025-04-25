@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 
 	"github.com/nbd-wtf/go-nostr"
@@ -27,8 +26,7 @@ func (ts *TSBackend) eventAlreadyIndexed(doc *AMBMetadata) (*nostr.Event, error)
 		"%s/collections/%s/documents/search?filter_by=d:=%s&&eventPubKey:=%s&q=&query_by=d,eventPubKey",
 		ts.Host, ts.CollectionName, doc.D, doc.EventPubKey)
 
-	resp, err := ts.makehttpRequest(url, http.MethodGet, nil)
-	body, _ := io.ReadAll(resp.Body)
+	resp, body, err := ts.makehttpRequest(url, http.MethodGet, nil)
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("Search for event failed, status: %d, body: %s", resp.StatusCode, string(body))
@@ -54,19 +52,20 @@ func (ts *TSBackend) indexDocument(ctx context.Context, doc *AMBMetadata, alread
 	}
 
 	url := fmt.Sprintf("%s/collections/%s/documents", ts.Host, ts.CollectionName)
-
 	jsonData, err := json.Marshal(doc)
 	if err != nil {
 		return err
 	}
-	resp, err := ts.makehttpRequest(url, http.MethodPost, jsonData)
-	body, _ := io.ReadAll(resp.Body)
+	resp, body, err := ts.makehttpRequest(url, http.MethodPost, jsonData)
+	if err != nil {
+		return fmt.Errorf("request failed: %v", err)
+	}
 
+	// Check status code and handle errors
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
 		return fmt.Errorf("failed to index document, status: %d, body: %s", resp.StatusCode, string(body))
 	}
 
 	return nil
 }
-
 

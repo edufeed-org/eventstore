@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"net/url"
@@ -32,7 +31,7 @@ func (ts *TSBackend) QueryEvents(ctx context.Context, filter nostr.Filter) (chan
 	return ch, nil
 }
 
-// SearchResources searches for resources and returns both the AMB metadata and converted Nostr events
+// searches for resources and returns both the AMB metadata and converted Nostr events
 func (ts *TSBackend) SearchResources(searchStr string) ([]nostr.Event, error) {
 	parsedQuery := ParseSearchQuery(searchStr)
 
@@ -59,9 +58,8 @@ func (ts *TSBackend) SearchResources(searchStr string) ([]nostr.Event, error) {
 	// Debug information
 	fmt.Printf("Search URL: %s\n", searchURL)
 
-	resp, err := ts.makehttpRequest(searchURL, http.MethodGet, nil)
+	resp, body, err := ts.makehttpRequest(searchURL, http.MethodGet, nil)
 
-	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("error reading response body: %v", err)
 	}
