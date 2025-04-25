@@ -352,7 +352,3 @@ func StringifiedJSONToNostrEvent(jsonString string) (nostr.Event, error) {
 	return event, nil
 }
 
-func Hello(name string) (string, error) {
-	resp := "Hello " + name + " nice to meet you"
-	return resp, nil
-}
