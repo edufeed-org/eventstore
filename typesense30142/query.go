@@ -159,7 +159,7 @@ func parseSearchResponse(responseBody []byte) ([]nostr.Event, error) {
 
 	for _, hit := range searchResponse.Hits {
 		// Extract the document from the hit
-		docMap, ok := hit["document"].(map[string]AMBMetadata)
+		docMap, ok := hit["document"]
 		if !ok {
 			return nil, fmt.Errorf("invalid document format in search results")
 		}
