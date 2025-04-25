@@ -15,7 +15,7 @@ import (
 
 	"github.com/fiatjaf/khatru"
 	"github.com/nbd-wtf/go-nostr"
-    "github.com/sroertgen/eventstore/typesense30142"
+    "github.com/edufeed-org/eventstore/typesense30142"
 )
 
 func main() {
