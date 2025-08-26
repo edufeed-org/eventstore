@@ -17,15 +17,22 @@ func (ts *TSBackend) QueryEvents(ctx context.Context, filter nostr.Filter) (chan
 	ch := make(chan *nostr.Event)
 
 	log.Printf("Processing query with search: %s", filter.Search)
-	
-	// If we have no search parameter, return an empty channel
-	if filter.Search == "" {
-		log.Printf("No search parameter provided, returning empty result")
-		close(ch)
-		return ch, nil
+
+	// Determine the limit for results (default to 100 if not specified)
+	limit := 100
+	if filter.Limit > 0 {
+		limit = filter.Limit
 	}
 
-	nostrsearch, err := ts.SearchResources(filter.Search)
+	// Use empty search string or the provided search string
+	searchStr := filter.Search
+	if searchStr == "" {
+		log.Printf("No search parameter provided, querying all documents with limit %d", limit)
+	} else {
+		log.Printf("Processing query with search: %s and limit %d", searchStr, limit)
+	}
+
+	nostrsearch, err := ts.SearchResourcesWithLimit(searchStr, limit)
 	if err != nil {
 		log.Printf("Search failed: %v", err)
 		// Return the channel anyway, but close it immediately
@@ -57,7 +64,7 @@ func (ts *TSBackend) QueryEvents(ctx context.Context, filter nostr.Filter) (chan
 			close(ch)
 		}
 	}()
-	
+
 	return ch, nil
 }
 
@@ -79,6 +86,76 @@ func (ts *TSBackend) SearchResources(searchStr string) ([]nostr.Event, error) {
 	// Start building the search URL
 	searchURL := fmt.Sprintf("%s/collections/%s/documents/search?validate_field_names=false&q=%s&query_by=%s",
 		ts.Host, ts.CollectionName, encodedQuery, queryBy)
+
+	// Add additional parameters
+	for key, value := range params {
+		searchURL += fmt.Sprintf("&%s=%s", key, url.QueryEscape(value))
+	}
+
+	// Debug information
+	fmt.Printf("Search URL: %s\n", searchURL)
+
+	resp, body, err := ts.makehttpRequest(searchURL, http.MethodGet, nil)
+
+	if err != nil {
+		return nil, fmt.Errorf("error reading response body: %v", err)
+	}
+
+	// Check for errors
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("search failed with status code %d: %s", resp.StatusCode, string(body))
+	}
+
+	// Try to parse the raw JSON to understand its structure
+	var rawResponse interface{}
+	if err := json.Unmarshal(body, &rawResponse); err != nil {
+		fmt.Printf("Warning: Could not parse raw response as JSON: %v\n", err)
+	} else {
+		// Check if we got a hits array
+		responseMap, ok := rawResponse.(map[string]interface{})
+		if ok {
+			if hits, exists := responseMap["hits"]; exists {
+				hitsArray, ok := hits.([]interface{})
+				if ok {
+					fmt.Printf("Response contains %d hits\n", len(hitsArray))
+					if len(hitsArray) > 0 {
+						// Look at the structure of the first hit
+						firstHit, ok := hitsArray[0].(map[string]interface{})
+						if ok {
+							fmt.Printf("First hit keys: %v\n", getMapKeys(firstHit))
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return parseSearchResponse(body)
+}
+
+// searches for resources with limit support and returns both the AMB metadata and converted Nostr events
+func (ts *TSBackend) SearchResourcesWithLimit(searchStr string, limit int) ([]nostr.Event, error) {
+	parsedQuery := ParseSearchQuery(searchStr)
+
+	mainQuery, params, err := BuildTypesenseQuery(parsedQuery)
+	if err != nil {
+		return nil, fmt.Errorf("error building Typesense query: %v", err)
+	}
+
+	// If no search terms provided, use wildcard to match all documents
+	if mainQuery == "" {
+		mainQuery = "*"
+	}
+
+	// URL encode the main query
+	encodedQuery := url.QueryEscape(mainQuery)
+
+	// Default fields to search in
+	queryBy := "name,description,about,learningResourceType,keywords,creator,publisher"
+
+	// Start building the search URL with limit
+	searchURL := fmt.Sprintf("%s/collections/%s/documents/search?validate_field_names=false&q=%s&query_by=%s&per_page=%d",
+		ts.Host, ts.CollectionName, encodedQuery, queryBy, limit)
 
 	// Add additional parameters
 	for key, value := range params {
@@ -154,7 +231,7 @@ func ParseSearchQuery(searchStr string) SearchQuery {
 			// This is a field:value pair with dot notation
 			fieldName := match[2]
 			fieldValue := match[3]
-			
+
 			// Add to the array of values for this field
 			query.FieldFilters[fieldName] = append(query.FieldFilters[fieldName], fieldValue)
 		} else if match[4] != "" {
@@ -164,7 +241,7 @@ func ParseSearchQuery(searchStr string) SearchQuery {
 				// Simple field:value without dot notation
 				fieldName := parts[0]
 				fieldValue := parts[1]
-				
+
 				// Add to the array of values for this field
 				query.FieldFilters[fieldName] = append(query.FieldFilters[fieldName], fieldValue)
 			} else {
@@ -198,7 +275,7 @@ func BuildTypesenseQuery(query SearchQuery) (string, map[string]string, error) {
 		for _, value := range values {
 			// Create the filter expression
 			filterExpr := fmt.Sprintf("%s:%s", field, value)
-			
+
 			// Add to the corresponding field group
 			fieldGroups[baseName] = append(fieldGroups[baseName], filterExpr)
 		}
@@ -234,44 +311,44 @@ func parseSearchResponse(responseBody []byte) ([]nostr.Event, error) {
 
 	// Debug: Print the raw response structure
 	fmt.Printf("Search response found %d hits\n", searchResponse.Found)
-	
+
 	nostrResults := make([]nostr.Event, 0, len(searchResponse.Hits))
 
 	for i, hit := range searchResponse.Hits {
 		// Debug: Print hit structure information
 		fmt.Printf("Processing hit %d, keys: %v\n", i, getMapKeys(hit))
-		
+
 		// Check if document exists in the hit
 		docRaw, exists := hit["document"]
 		if !exists {
 			fmt.Printf("Warning: hit %d has no 'document' field\n", i)
 			continue // Skip this hit
 		}
-		
+
 		// Extract document directly as a map[string]interface{}
 		docMap, ok := docRaw.(map[string]interface{})
 		if !ok {
 			fmt.Printf("Warning: hit %d document is not a map, type: %T\n", i, docRaw)
 			continue // Skip this hit
 		}
-		
+
 		// Debug: Print document keys
 		fmt.Printf("Document keys: %v\n", getMapKeys(docMap))
-		
+
 		// Check for EventRaw field directly
 		eventRawVal, hasEventRaw := docMap["eventRaw"]
 		if !hasEventRaw {
 			fmt.Printf("Warning: document has no 'eventRaw' field\n")
 			continue // Skip this document
 		}
-		
+
 		// Try to extract EventRaw as string
 		eventRawStr, ok := eventRawVal.(string)
 		if !ok {
 			fmt.Printf("Warning: eventRaw is not a string, type: %T\n", eventRawVal)
 			continue // Skip this document
 		}
-		
+
 		// Convert the EventRaw string to a Nostr event
 		nostrEvent, err := StringifiedJSONToNostrEvent(eventRawStr)
 		if err != nil {
