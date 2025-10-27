@@ -77,17 +77,17 @@ type Audience struct {
 
 // Teaches represents what the content teaches
 type Teaches struct {
-  ControlledVocabulary
+	ControlledVocabulary
 }
 
 // Assesses represents what the content assesses
 type Assesses struct {
-  ControlledVocabulary
+	ControlledVocabulary
 }
 
 // CompetencyRequired represents required competencies
 type CompetencyRequired struct {
-  ControlledVocabulary
+	ControlledVocabulary
 }
 
 // EducationalLevel represents the educational level
@@ -102,7 +102,7 @@ type InteractivityType struct {
 
 // IsBasedOn represents a reference to source material
 type IsBasedOn struct {
-  ID string `json:"id"`
+	ID      string   `json:"id"`
 	Type    string   `json:"type,omitempty"`
 	Name    string   `json:"name"`
 	Creator *Creator `json:"creator,omitempty"`
@@ -133,6 +133,41 @@ type Trailer struct {
 type License struct {
 	ID   string `json:"id"`
 	Name string `json:"name,omitempty"`
+}
+
+// MainEntityProvider represents the provider of a web page
+type MainEntityProvider struct {
+	ID   string `json:"id,omitempty"`
+	Name string `json:"name,omitempty"`
+	Type string `json:"type,omitempty"`
+}
+
+// MainEntityOfPage represents meta-metadata about web pages
+type MainEntityOfPage struct {
+	ID           string              `json:"id"`
+	Type         string              `json:"type"`
+	Provider     *MainEntityProvider `json:"provider,omitempty"`
+	DateCreated  string              `json:"dateCreated,omitempty"`
+	DateModified string              `json:"dateModified,omitempty"`
+}
+
+// Encoding represents a media encoding (MediaObject)
+type Encoding struct {
+	Type           string `json:"type"`
+	ContentUrl     string `json:"contentUrl,omitempty"`
+	EmbedUrl       string `json:"embedUrl,omitempty"`
+	EncodingFormat string `json:"encodingFormat,omitempty"`
+	ContentSize    string `json:"contentSize,omitempty"`
+	Sha256         string `json:"sha256,omitempty"`
+	Bitrate        string `json:"bitrate,omitempty"`
+}
+
+// Caption represents a caption/subtitle file (MediaObject)
+type Caption struct {
+	ID             string `json:"id"`
+	Type           string `json:"type"`
+	EncodingFormat string `json:"encodingFormat,omitempty"`
+	InLanguage     string `json:"inLanguage,omitempty"`
 }
 
 // NostrMetadata contains Nostr-specific metadata
@@ -190,9 +225,12 @@ type AMBMetadata struct {
 	HasPart   []*HasPart   `json:"hasPart,omitempty"`
 
 	// Technical
-	Duration string `json:"duration,omitempty"`
-	// TODO Encoding  ``
-	// TODO Caption
+	Duration string      `json:"duration,omitempty"`
+	Encoding []*Encoding `json:"encoding,omitempty"`
+	Caption  []*Caption  `json:"caption,omitempty"`
+
+	// Meta-Metadata
+	MainEntityOfPage []*MainEntityOfPage `json:"mainEntityOfPage,omitempty"`
 
 	// Nostr integration
 	NostrMetadata `json:",inline"`
