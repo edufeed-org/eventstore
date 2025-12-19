@@ -68,7 +68,7 @@ func parseNestedValue(result map[string]interface{}, key string, value string) {
 }
 
 // separateArrayInstances detects multiple instances in array fields
-// When we see a repeated base property (e.g., second "name" in creator:name),
+// When we see a repeated base property (e.g., second "id" in about:id),
 // it indicates a new array item
 func separateArrayInstances(tags []tagGroup) []map[string]interface{} {
 	if len(tags) == 0 {
@@ -80,24 +80,37 @@ func separateArrayInstances(tags []tagGroup) []map[string]interface{} {
 	seenKeys := make(map[string]bool)
 
 	for _, tag := range tags {
-		// Get the immediate child key after base
-		// E.g., "creator:name" -> "name", "creator:affiliation:name" -> "affiliation"
+		// Get the parts after the base key
+		// E.g., "about:id" -> ["about", "id"]
+		// E.g., "about:prefLabel:de" -> ["about", "prefLabel", "de"]
 		parts := strings.Split(tag.fullKey, ":")
 		if len(parts) < 2 {
 			continue
 		}
 
+		// For detecting array boundaries, we use the immediate child key
+		// But for prefLabel:lang pattern, we consider the full subkey including language
+		// as part of the same object, so we only look at immediate key for "id", "type"
+		// which are the typical array boundary indicators
 		immediateKey := parts[1]
 
-		// If we've seen this immediate key before and current instance is not empty,
+		// Only use "id" as the array boundary indicator
+		// This ensures prefLabel:de and prefLabel:en are kept in the same instance
+		boundaryKey := immediateKey
+		if immediateKey != "id" {
+			// For non-id keys, don't trigger a new instance even if repeated
+			boundaryKey = tag.fullKey // Use full key so nested language variants don't split
+		}
+
+		// If we've seen this boundary key before and current instance is not empty,
 		// we're starting a new array item
-		if seenKeys[immediateKey] && len(currentInstance) > 0 {
+		if seenKeys[boundaryKey] && len(currentInstance) > 0 {
 			instances = append(instances, currentInstance)
 			currentInstance = make(map[string]interface{})
 			seenKeys = make(map[string]bool)
 		}
 
-		seenKeys[immediateKey] = true
+		seenKeys[boundaryKey] = true
 
 		// Remove base key from the path
 		subKey := strings.Join(parts[1:], ":")
@@ -164,6 +177,7 @@ func handleATags(tags nostr.Tags) (isBasedOn, isPartOf, hasPart []string) {
 // Field-specific parsers for complex nested structures
 
 // parseControlledVocabularyArray parses an array of ControlledVocabulary items from grouped tags
+// Handles NIP-compliant format where language is embedded in key: "prefLabel:de" -> "Mathematik"
 func parseControlledVocabularyArray(instances []map[string]interface{}) []ControlledVocabulary {
 	var result []ControlledVocabulary
 	for _, inst := range instances {
@@ -171,15 +185,22 @@ func parseControlledVocabularyArray(instances []map[string]interface{}) []Contro
 		if id, ok := inst["id"].(string); ok {
 			cv.ID = id
 		}
-		if prefLabel, ok := inst["prefLabel"].(string); ok {
-			cv.PrefLabel = prefLabel
-		}
-		if inLanguage, ok := inst["inLanguage"].(string); ok {
-			cv.InLanguage = inLanguage
-		}
 		if typ, ok := inst["type"].(string); ok {
 			cv.Type = typ
 		}
+
+		// Handle prefLabel as nested map (NIP format: prefLabel:lang -> label)
+		// The separateArrayInstances() function creates nested structure like:
+		// {"prefLabel": {"de": "Mathematik", "en": "Mathematics"}}
+		if prefLabelMap, ok := inst["prefLabel"].(map[string]interface{}); ok {
+			cv.PrefLabel = make(map[string]string)
+			for lang, label := range prefLabelMap {
+				if labelStr, ok := label.(string); ok {
+					cv.PrefLabel[lang] = labelStr
+				}
+			}
+		}
+
 		result = append(result, cv)
 	}
 	return result
@@ -445,6 +466,7 @@ func parseLicense(instances []map[string]interface{}) *License {
 }
 
 // parseConditionsOfAccess parses a single conditionsOfAccess from grouped tags
+// Handles NIP-compliant format where language is embedded in key: "prefLabel:de" -> "label"
 func parseConditionsOfAccess(instances []map[string]interface{}) *ConditionsOfAccess {
 	if len(instances) == 0 {
 		return nil
@@ -454,19 +476,25 @@ func parseConditionsOfAccess(instances []map[string]interface{}) *ConditionsOfAc
 	if id, ok := inst["id"].(string); ok {
 		coa.ID = id
 	}
-	if prefLabel, ok := inst["prefLabel"].(string); ok {
-		coa.PrefLabel = prefLabel
-	}
-	if inLanguage, ok := inst["inLanguage"].(string); ok {
-		coa.InLanguage = inLanguage
-	}
 	if typ, ok := inst["type"].(string); ok {
 		coa.Type = typ
 	}
+
+	// Handle prefLabel as nested map (NIP format: prefLabel:lang -> label)
+	if prefLabelMap, ok := inst["prefLabel"].(map[string]interface{}); ok {
+		coa.PrefLabel = make(map[string]string)
+		for lang, label := range prefLabelMap {
+			if labelStr, ok := label.(string); ok {
+				coa.PrefLabel[lang] = labelStr
+			}
+		}
+	}
+
 	return coa
 }
 
 // parseInteractivityType parses a single interactivityType from grouped tags
+// Handles NIP-compliant format where language is embedded in key: "prefLabel:de" -> "label"
 func parseInteractivityType(instances []map[string]interface{}) *InteractivityType {
 	if len(instances) == 0 {
 		return nil
@@ -476,15 +504,20 @@ func parseInteractivityType(instances []map[string]interface{}) *InteractivityTy
 	if id, ok := inst["id"].(string); ok {
 		it.ID = id
 	}
-	if prefLabel, ok := inst["prefLabel"].(string); ok {
-		it.PrefLabel = prefLabel
-	}
-	if inLanguage, ok := inst["inLanguage"].(string); ok {
-		it.InLanguage = inLanguage
-	}
 	if typ, ok := inst["type"].(string); ok {
 		it.Type = typ
 	}
+
+	// Handle prefLabel as nested map (NIP format: prefLabel:lang -> label)
+	if prefLabelMap, ok := inst["prefLabel"].(map[string]interface{}); ok {
+		it.PrefLabel = make(map[string]string)
+		for lang, label := range prefLabelMap {
+			if labelStr, ok := label.(string); ok {
+				it.PrefLabel[lang] = labelStr
+			}
+		}
+	}
+
 	return it
 }
 

@@ -10,10 +10,9 @@ type BaseEntity struct {
 }
 
 type ControlledVocabulary struct {
-	Type       string `json:"type,omitempty"`
-	ID         string `json:"id"`
-	PrefLabel  string `json:"prefLabel"`
-	InLanguage string `json:"inLanguage,omitempty"`
+	Type      string            `json:"type,omitempty"`
+	ID        string            `json:"id"`
+	PrefLabel map[string]string `json:"prefLabel,omitempty"` // key=language code, value=label
 }
 
 // LanguageEntity adds language support to entities

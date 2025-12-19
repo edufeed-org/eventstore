@@ -84,8 +84,7 @@ func TestNostrToAMB_About(t *testing.T) {
 	tags := nostr.Tags{
 		{"d", "test-resource-id"},
 		{"about:id", "http://w3id.org/kim/schulfaecher/s1009"},
-		{"about:prefLabel", "Französisch"},
-		{"about:inLanguage", "de"},
+		{"about:prefLabel:de", "Französisch"},
 		{"about:type", "Concept"},
 	}
 	event := createTestEvent(tags)
@@ -98,8 +97,7 @@ func TestNostrToAMB_About(t *testing.T) {
 	assert.NotEmpty(amb.About)
 	assert.Equal(1, len(amb.About))
 	assert.Equal("http://w3id.org/kim/schulfaecher/s1009", amb.About[0].ID)
-	assert.Equal("Französisch", amb.About[0].PrefLabel)
-	assert.Equal("de", amb.About[0].InLanguage)
+	assert.Equal("Französisch", amb.About[0].PrefLabel["de"])
 	assert.Equal("Concept", amb.About[0].Type)
 }
 
@@ -361,8 +359,7 @@ func TestNostrToAMB_ConditionsOfAccess(t *testing.T) {
 	tags := nostr.Tags{
 		{"d", "test-resource-id"},
 		{"conditionsOfAccess:id", "http://w3id.org/kim/conditionsOfAccess/no_login"},
-		{"conditionsOfAccess:prefLabel", "Kein Login"},
-		{"conditionsOfAccess:inLanguage", "de"},
+		{"conditionsOfAccess:prefLabel:de", "Kein Login"},
 		{"conditionsOfAccess:type", "Concept"},
 	}
 	event := createTestEvent(tags)
@@ -374,8 +371,7 @@ func TestNostrToAMB_ConditionsOfAccess(t *testing.T) {
 
 	assert.NotNil(amb.ConditionsOfAccess)
 	assert.Equal("http://w3id.org/kim/conditionsOfAccess/no_login", amb.ConditionsOfAccess.ID)
-	assert.Equal("Kein Login", amb.ConditionsOfAccess.PrefLabel)
-	assert.Equal("de", amb.ConditionsOfAccess.InLanguage)
+	assert.Equal("Kein Login", amb.ConditionsOfAccess.PrefLabel["de"])
 }
 
 func TestNostrToAMB_LearningResourceType(t *testing.T) {
@@ -384,11 +380,9 @@ func TestNostrToAMB_LearningResourceType(t *testing.T) {
 	tags := nostr.Tags{
 		{"d", "test-resource-id"},
 		{"learningResourceType:id", "http://w3id.org/openeduhub/vocabs/new_lrt/video"},
-		{"learningResourceType:prefLabel", "Video"},
-		{"learningResourceType:inLanguage", "de"},
+		{"learningResourceType:prefLabel:de", "Video"},
 		{"learningResourceType:id", "http://w3id.org/openeduhub/vocabs/new_lrt/tutorial"},
-		{"learningResourceType:prefLabel", "Tutorial"},
-		{"learningResourceType:inLanguage", "en"},
+		{"learningResourceType:prefLabel:en", "Tutorial"},
 	}
 	event := createTestEvent(tags)
 
@@ -400,12 +394,10 @@ func TestNostrToAMB_LearningResourceType(t *testing.T) {
 	assert.Equal(2, len(amb.LearningResourceType))
 
 	assert.Equal("http://w3id.org/openeduhub/vocabs/new_lrt/video", amb.LearningResourceType[0].ID)
-	assert.Equal("Video", amb.LearningResourceType[0].PrefLabel)
-	assert.Equal("de", amb.LearningResourceType[0].InLanguage)
+	assert.Equal("Video", amb.LearningResourceType[0].PrefLabel["de"])
 
 	assert.Equal("http://w3id.org/openeduhub/vocabs/new_lrt/tutorial", amb.LearningResourceType[1].ID)
-	assert.Equal("Tutorial", amb.LearningResourceType[1].PrefLabel)
-	assert.Equal("en", amb.LearningResourceType[1].InLanguage)
+	assert.Equal("Tutorial", amb.LearningResourceType[1].PrefLabel["en"])
 }
 
 func TestNostrToAMB_Audience(t *testing.T) {
@@ -414,11 +406,9 @@ func TestNostrToAMB_Audience(t *testing.T) {
 	tags := nostr.Tags{
 		{"d", "test-resource-id"},
 		{"audience:id", "http://purl.org/dcx/lrmi-vocabs/educationalAudienceRole/student"},
-		{"audience:prefLabel", "Schüler:in"},
-		{"audience:inLanguage", "de"},
+		{"audience:prefLabel:de", "Schüler:in"},
 		{"audience:id", "http://purl.org/dcx/lrmi-vocabs/educationalAudienceRole/teacher"},
-		{"audience:prefLabel", "Lehrer:in"},
-		{"audience:inLanguage", "de"},
+		{"audience:prefLabel:de", "Lehrer:in"},
 	}
 	event := createTestEvent(tags)
 
@@ -430,12 +420,10 @@ func TestNostrToAMB_Audience(t *testing.T) {
 	assert.Equal(2, len(amb.Audience))
 
 	assert.Equal("http://purl.org/dcx/lrmi-vocabs/educationalAudienceRole/student", amb.Audience[0].ID)
-	assert.Equal("Schüler:in", amb.Audience[0].PrefLabel)
-	assert.Equal("de", amb.Audience[0].InLanguage)
+	assert.Equal("Schüler:in", amb.Audience[0].PrefLabel["de"])
 
 	assert.Equal("http://purl.org/dcx/lrmi-vocabs/educationalAudienceRole/teacher", amb.Audience[1].ID)
-	assert.Equal("Lehrer:in", amb.Audience[1].PrefLabel)
-	assert.Equal("de", amb.Audience[1].InLanguage)
+	assert.Equal("Lehrer:in", amb.Audience[1].PrefLabel["de"])
 }
 
 func TestNostrToAMB_Teaches(t *testing.T) {
@@ -444,11 +432,9 @@ func TestNostrToAMB_Teaches(t *testing.T) {
 	tags := nostr.Tags{
 		{"d", "test-resource-id"},
 		{"teaches:id", "http://awesome-skills.org/1"},
-		{"teaches:prefLabel", "Zuhören"},
-		{"teaches:inLanguage", "de"},
+		{"teaches:prefLabel:de", "Zuhören"},
 		{"teaches:id", "http://awesome-skills.org/2"},
-		{"teaches:prefLabel", "Sprechen"},
-		{"teaches:inLanguage", "de"},
+		{"teaches:prefLabel:de", "Sprechen"},
 	}
 	event := createTestEvent(tags)
 
@@ -460,12 +446,10 @@ func TestNostrToAMB_Teaches(t *testing.T) {
 	assert.Equal(2, len(amb.Teaches))
 
 	assert.Equal("http://awesome-skills.org/1", amb.Teaches[0].ID)
-	assert.Equal("Zuhören", amb.Teaches[0].PrefLabel)
-	assert.Equal("de", amb.Teaches[0].InLanguage)
+	assert.Equal("Zuhören", amb.Teaches[0].PrefLabel["de"])
 
 	assert.Equal("http://awesome-skills.org/2", amb.Teaches[1].ID)
-	assert.Equal("Sprechen", amb.Teaches[1].PrefLabel)
-	assert.Equal("de", amb.Teaches[1].InLanguage)
+	assert.Equal("Sprechen", amb.Teaches[1].PrefLabel["de"])
 }
 
 func TestNostrToAMB_Assesses(t *testing.T) {
@@ -474,11 +458,9 @@ func TestNostrToAMB_Assesses(t *testing.T) {
 	tags := nostr.Tags{
 		{"d", "test-resource-id"},
 		{"assesses:id", "http://awesome-skills.org/1"},
-		{"assesses:prefLabel", "Hörverständnis"},
-		{"assesses:inLanguage", "de"},
+		{"assesses:prefLabel:de", "Hörverständnis"},
 		{"assesses:id", "http://awesome-skills.org/2"},
-		{"assesses:prefLabel", "Grammatik"},
-		{"assesses:inLanguage", "de"},
+		{"assesses:prefLabel:de", "Grammatik"},
 	}
 	event := createTestEvent(tags)
 
@@ -490,12 +472,10 @@ func TestNostrToAMB_Assesses(t *testing.T) {
 	assert.Equal(2, len(amb.Assesses))
 
 	assert.Equal("http://awesome-skills.org/1", amb.Assesses[0].ID)
-	assert.Equal("Hörverständnis", amb.Assesses[0].PrefLabel)
-	assert.Equal("de", amb.Assesses[0].InLanguage)
+	assert.Equal("Hörverständnis", amb.Assesses[0].PrefLabel["de"])
 
 	assert.Equal("http://awesome-skills.org/2", amb.Assesses[1].ID)
-	assert.Equal("Grammatik", amb.Assesses[1].PrefLabel)
-	assert.Equal("de", amb.Assesses[1].InLanguage)
+	assert.Equal("Grammatik", amb.Assesses[1].PrefLabel["de"])
 }
 
 func TestNostrToAMB_CompetencyRequired(t *testing.T) {
@@ -504,11 +484,9 @@ func TestNostrToAMB_CompetencyRequired(t *testing.T) {
 	tags := nostr.Tags{
 		{"d", "test-resource-id"},
 		{"competencyRequired:id", "http://awesome-skills.org/1"},
-		{"competencyRequired:prefLabel", "Basisvokabular"},
-		{"competencyRequired:inLanguage", "de"},
+		{"competencyRequired:prefLabel:de", "Basisvokabular"},
 		{"competencyRequired:id", "http://awesome-skills.org/2"},
-		{"competencyRequired:prefLabel", "Grundkenntnisse"},
-		{"competencyRequired:inLanguage", "de"},
+		{"competencyRequired:prefLabel:de", "Grundkenntnisse"},
 	}
 	event := createTestEvent(tags)
 
@@ -520,12 +498,10 @@ func TestNostrToAMB_CompetencyRequired(t *testing.T) {
 	assert.Equal(2, len(amb.CompetencyRequired))
 
 	assert.Equal("http://awesome-skills.org/1", amb.CompetencyRequired[0].ID)
-	assert.Equal("Basisvokabular", amb.CompetencyRequired[0].PrefLabel)
-	assert.Equal("de", amb.CompetencyRequired[0].InLanguage)
+	assert.Equal("Basisvokabular", amb.CompetencyRequired[0].PrefLabel["de"])
 
 	assert.Equal("http://awesome-skills.org/2", amb.CompetencyRequired[1].ID)
-	assert.Equal("Grundkenntnisse", amb.CompetencyRequired[1].PrefLabel)
-	assert.Equal("de", amb.CompetencyRequired[1].InLanguage)
+	assert.Equal("Grundkenntnisse", amb.CompetencyRequired[1].PrefLabel["de"])
 }
 
 func TestNostrToAMB_EducationalLevel(t *testing.T) {
@@ -534,11 +510,9 @@ func TestNostrToAMB_EducationalLevel(t *testing.T) {
 	tags := nostr.Tags{
 		{"d", "test-resource-id"},
 		{"educationalLevel:id", "https://w3id.org/kim/educationalLevel/level_2"},
-		{"educationalLevel:prefLabel", "Sekundarstufe 1"},
-		{"educationalLevel:inLanguage", "de"},
+		{"educationalLevel:prefLabel:de", "Sekundarstufe 1"},
 		{"educationalLevel:id", "https://w3id.org/kim/educationalLevel/level_3"},
-		{"educationalLevel:prefLabel", "Sekundarstufe 2"},
-		{"educationalLevel:inLanguage", "de"},
+		{"educationalLevel:prefLabel:de", "Sekundarstufe 2"},
 	}
 	event := createTestEvent(tags)
 
@@ -550,12 +524,10 @@ func TestNostrToAMB_EducationalLevel(t *testing.T) {
 	assert.Equal(2, len(amb.EducationalLevel))
 
 	assert.Equal("https://w3id.org/kim/educationalLevel/level_2", amb.EducationalLevel[0].ID)
-	assert.Equal("Sekundarstufe 1", amb.EducationalLevel[0].PrefLabel)
-	assert.Equal("de", amb.EducationalLevel[0].InLanguage)
+	assert.Equal("Sekundarstufe 1", amb.EducationalLevel[0].PrefLabel["de"])
 
 	assert.Equal("https://w3id.org/kim/educationalLevel/level_3", amb.EducationalLevel[1].ID)
-	assert.Equal("Sekundarstufe 2", amb.EducationalLevel[1].PrefLabel)
-	assert.Equal("de", amb.EducationalLevel[1].InLanguage)
+	assert.Equal("Sekundarstufe 2", amb.EducationalLevel[1].PrefLabel["de"])
 }
 
 func TestNostrToAMB_InteractivityType(t *testing.T) {
@@ -564,8 +536,7 @@ func TestNostrToAMB_InteractivityType(t *testing.T) {
 	tags := nostr.Tags{
 		{"d", "test-resource-id"},
 		{"interactivityType:id", "http://purl.org/dcx/lrmi-vocabs/interactivityType/active"},
-		{"interactivityType:prefLabel", "aktiv"},
-		{"interactivityType:inLanguage", "de"},
+		{"interactivityType:prefLabel:de", "aktiv"},
 	}
 	event := createTestEvent(tags)
 
@@ -576,8 +547,7 @@ func TestNostrToAMB_InteractivityType(t *testing.T) {
 
 	assert.NotNil(amb.InteractivityType)
 	assert.Equal("http://purl.org/dcx/lrmi-vocabs/interactivityType/active", amb.InteractivityType.ID)
-	assert.Equal("aktiv", amb.InteractivityType.PrefLabel)
-	assert.Equal("de", amb.InteractivityType.InLanguage)
+	assert.Equal("aktiv", amb.InteractivityType.PrefLabel["de"])
 }
 
 func TestNostrToAMB_IsBasedOn(t *testing.T) {
@@ -696,4 +666,66 @@ func TestNostrToAMB_Trailer(t *testing.T) {
 	assert.Equal("abc123", amb.Trailer[0].Sha256)
 	assert.Equal("https://example.com/embed", amb.Trailer[0].EmbedUrl)
 	assert.Equal("1Mbps", amb.Trailer[0].Bitrate)
+}
+
+// TestNostrToAMB_About_MultiLanguage tests multiple language labels for a single concept
+// This is the key NIP-compliant feature: prefLabel:lang format allows multiple languages
+func TestNostrToAMB_About_MultiLanguage(t *testing.T) {
+	assert := assert.New(t)
+
+	tags := nostr.Tags{
+		{"d", "test-resource-id"},
+		{"about:id", "http://w3id.org/kim/schulfaecher/s1017"},
+		{"about:prefLabel:de", "Mathematik"},
+		{"about:prefLabel:en", "Mathematics"},
+		{"about:type", "Concept"},
+	}
+	event := createTestEvent(tags)
+
+	amb, err := NostrToAMB(event)
+
+	assert.NoError(err)
+	assert.NotNil(amb)
+
+	assert.NotEmpty(amb.About)
+	assert.Equal(1, len(amb.About))
+	assert.Equal("http://w3id.org/kim/schulfaecher/s1017", amb.About[0].ID)
+	assert.Equal("Mathematik", amb.About[0].PrefLabel["de"])
+	assert.Equal("Mathematics", amb.About[0].PrefLabel["en"])
+	assert.Equal("Concept", amb.About[0].Type)
+}
+
+// TestNostrToAMB_MultipleAboutWithMultiLanguage tests multiple about items with multiple languages
+func TestNostrToAMB_MultipleAboutWithMultiLanguage(t *testing.T) {
+	assert := assert.New(t)
+
+	tags := nostr.Tags{
+		{"d", "test-resource-id"},
+		{"about:id", "http://w3id.org/kim/schulfaecher/s1017"},
+		{"about:prefLabel:de", "Mathematik"},
+		{"about:prefLabel:en", "Mathematics"},
+		{"about:type", "Concept"},
+		{"about:id", "http://w3id.org/kim/schulfaecher/s1005"},
+		{"about:prefLabel:de", "Deutsch"},
+		{"about:prefLabel:en", "German"},
+		{"about:type", "Concept"},
+	}
+	event := createTestEvent(tags)
+
+	amb, err := NostrToAMB(event)
+
+	assert.NoError(err)
+	assert.NotNil(amb)
+
+	assert.Equal(2, len(amb.About))
+
+	// First about
+	assert.Equal("http://w3id.org/kim/schulfaecher/s1017", amb.About[0].ID)
+	assert.Equal("Mathematik", amb.About[0].PrefLabel["de"])
+	assert.Equal("Mathematics", amb.About[0].PrefLabel["en"])
+
+	// Second about
+	assert.Equal("http://w3id.org/kim/schulfaecher/s1005", amb.About[1].ID)
+	assert.Equal("Deutsch", amb.About[1].PrefLabel["de"])
+	assert.Equal("German", amb.About[1].PrefLabel["en"])
 }
