@@ -16,7 +16,8 @@ import (
 func (ts *TSBackend) QueryEvents(ctx context.Context, filter nostr.Filter) (chan *nostr.Event, error) {
 	ch := make(chan *nostr.Event)
 
-	log.Printf("Processing query with search: %s", filter.Search)
+	log.Printf("Processing query with filter: authors=%v, #d=%v, ids=%v, search=%s",
+		filter.Authors, filter.Tags["d"], filter.IDs, filter.Search)
 
 	// Determine the limit for results (default to 100 if not specified)
 	limit := 100
@@ -24,15 +25,73 @@ func (ts *TSBackend) QueryEvents(ctx context.Context, filter nostr.Filter) (chan
 		limit = filter.Limit
 	}
 
-	// Use empty search string or the provided search string
-	searchStr := filter.Search
-	if searchStr == "" {
-		log.Printf("No search parameter provided, querying all documents with limit %d", limit)
-	} else {
-		log.Printf("Processing query with search: %s and limit %d", searchStr, limit)
+	// Build filter expressions from nostr filter fields
+	var filterExpressions []string
+
+	// Filter by authors (pubkey)
+	if len(filter.Authors) > 0 {
+		var authorFilters []string
+		for _, author := range filter.Authors {
+			authorFilters = append(authorFilters, fmt.Sprintf("eventPubKey:=`%s`", author))
+		}
+		if len(authorFilters) == 1 {
+			filterExpressions = append(filterExpressions, authorFilters[0])
+		} else {
+			filterExpressions = append(filterExpressions, fmt.Sprintf("(%s)", strings.Join(authorFilters, " || ")))
+		}
 	}
 
-	nostrsearch, err := ts.SearchResourcesWithLimit(searchStr, limit)
+	// Filter by event IDs
+	if len(filter.IDs) > 0 {
+		var idFilters []string
+		for _, id := range filter.IDs {
+			idFilters = append(idFilters, fmt.Sprintf("eventID:=`%s`", id))
+		}
+		if len(idFilters) == 1 {
+			filterExpressions = append(filterExpressions, idFilters[0])
+		} else {
+			filterExpressions = append(filterExpressions, fmt.Sprintf("(%s)", strings.Join(idFilters, " || ")))
+		}
+	}
+
+	// Filter by d-tag (for addressable events)
+	if dTags := filter.Tags["d"]; len(dTags) > 0 {
+		var dFilters []string
+		for _, d := range dTags {
+			dFilters = append(dFilters, fmt.Sprintf("d:=`%s`", d))
+		}
+		if len(dFilters) == 1 {
+			filterExpressions = append(filterExpressions, dFilters[0])
+		} else {
+			filterExpressions = append(filterExpressions, fmt.Sprintf("(%s)", strings.Join(dFilters, " || ")))
+		}
+	}
+
+	// Filter by kinds (optional since this store is kind-specific, but good for safety)
+	if len(filter.Kinds) > 0 {
+		var kindFilters []string
+		for _, kind := range filter.Kinds {
+			kindFilters = append(kindFilters, fmt.Sprintf("eventKind:=%d", kind))
+		}
+		if len(kindFilters) == 1 {
+			filterExpressions = append(filterExpressions, kindFilters[0])
+		} else {
+			filterExpressions = append(filterExpressions, fmt.Sprintf("(%s)", strings.Join(kindFilters, " || ")))
+		}
+	}
+
+	// Combine all filter expressions
+	nostrFilterBy := strings.Join(filterExpressions, " && ")
+
+	// Use empty search string or the provided search string
+	searchStr := filter.Search
+	if searchStr == "" && nostrFilterBy == "" {
+		log.Printf("No search parameter or filters provided, querying all documents with limit %d", limit)
+	} else {
+		log.Printf("Processing query with search: %s, nostr filters: %s, limit %d", searchStr, nostrFilterBy, limit)
+	}
+
+	nostrsearch, err := ts.SearchResourcesWithLimitAndFilter(searchStr, limit, nostrFilterBy)
 	if err != nil {
 		log.Printf("Search failed: %v", err)
 		// Return the channel anyway, but close it immediately
@@ -156,6 +215,86 @@ func (ts *TSBackend) SearchResourcesWithLimit(searchStr string, limit int) ([]no
 	// Start building the search URL with limit
 	searchURL := fmt.Sprintf("%s/collections/%s/documents/search?validate_field_names=false&q=%s&query_by=%s&per_page=%d",
 		ts.Host, ts.CollectionName, encodedQuery, queryBy, limit)
+
+	// Add additional parameters
+	for key, value := range params {
+		searchURL += fmt.Sprintf("&%s=%s", key, url.QueryEscape(value))
+	}
+
+	// Debug information
+	fmt.Printf("Search URL: %s\n", searchURL)
+
+	resp, body, err := ts.makehttpRequest(searchURL, http.MethodGet, nil)
+
+	if err != nil {
+		return nil, fmt.Errorf("error reading response body: %v", err)
+	}
+
+	// Check for errors
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("search failed with status code %d: %s", resp.StatusCode, string(body))
+	}
+
+	// Try to parse the raw JSON to understand its structure
+	var rawResponse interface{}
+	if err := json.Unmarshal(body, &rawResponse); err != nil {
+		fmt.Printf("Warning: Could not parse raw response as JSON: %v\n", err)
+	} else {
+		// Check if we got a hits array
+		responseMap, ok := rawResponse.(map[string]interface{})
+		if ok {
+			if hits, exists := responseMap["hits"]; exists {
+				hitsArray, ok := hits.([]interface{})
+				if ok {
+					fmt.Printf("Response contains %d hits\n", len(hitsArray))
+					if len(hitsArray) > 0 {
+						// Look at the structure of the first hit
+						firstHit, ok := hitsArray[0].(map[string]interface{})
+						if ok {
+							fmt.Printf("First hit keys: %v\n", getMapKeys(firstHit))
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return parseSearchResponse(body)
+}
+
+// SearchResourcesWithLimitAndFilter searches with limit and additional nostr filter expressions
+func (ts *TSBackend) SearchResourcesWithLimitAndFilter(searchStr string, limit int, nostrFilterBy string) ([]nostr.Event, error) {
+	parsedQuery := ParseSearchQuery(searchStr)
+
+	mainQuery, params, err := BuildTypesenseQuery(parsedQuery)
+	if err != nil {
+		return nil, fmt.Errorf("error building Typesense query: %v", err)
+	}
+
+	// If no search terms provided, use wildcard to match all documents
+	if mainQuery == "" {
+		mainQuery = "*"
+	}
+
+	// URL encode the main query
+	encodedQuery := url.QueryEscape(mainQuery)
+
+	// Default fields to search in
+	queryBy := "name,description,about,learningResourceType,keywords,creator,publisher"
+
+	// Start building the search URL with limit
+	searchURL := fmt.Sprintf("%s/collections/%s/documents/search?validate_field_names=false&q=%s&query_by=%s&per_page=%d",
+		ts.Host, ts.CollectionName, encodedQuery, queryBy, limit)
+
+	// Combine nostr filter with search filter
+	existingFilter := params["filter_by"]
+	if nostrFilterBy != "" {
+		if existingFilter != "" {
+			params["filter_by"] = existingFilter + " && " + nostrFilterBy
+		} else {
+			params["filter_by"] = nostrFilterBy
+		}
+	}
 
 	// Add additional parameters
 	for key, value := range params {
