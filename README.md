@@ -3,7 +3,71 @@
 Eventstore to be used with [khatru](https://github.com/fiatjaf/khatru) relays.
 
 Current available stores:
-  - typesense30142: A relay specialiced for [AMB](https://dini-ag-kim.github.io/amb/latest/#context) Metadata events. See https://github.com/edufeed-org/nips/blob/edufeed-amb/edufeed.md for the current AMB NIP
+  - typesense30142: A relay specialized for [AMB](https://dini-ag-kim.github.io/amb/latest/#context) Metadata events. See https://github.com/edufeed-org/nips/blob/edufeed-amb/edufeed.md for the current AMB NIP
+
+## Search Query Syntax
+
+The eventstore supports [NIP-50](https://github.com/nostr-protocol/nips/blob/master/50.md) full-text search with advanced filtering capabilities.
+
+### Basic Full-Text Search
+
+Search across all text fields (name, description, keywords, etc.):
+
+```bash
+nak req --search "mathematik" -k 30142 ws://localhost:3334
+```
+
+### Field-Specific Filtering
+
+Filter by specific nested fields using dot notation `field.path:value`:
+
+```bash
+# Filter by publisher name
+nak req --search "publisher.name:e-teaching.org" -k 30142 ws://localhost:3334
+
+# Filter by learning resource type (with language-specific label)
+nak req --search "learningResourceType.prefLabel.de:Video" -k 30142 ws://localhost:3334
+
+# Filter by subject/topic
+nak req --search "about.prefLabel.de:Mathematik" -k 30142 ws://localhost:3334
+```
+
+### Combined Queries
+
+Combine free-text search with field filters:
+
+```bash
+# Search for "forschung" in text fields AND filter by publisher
+nak req --search "forschung publisher.name:e-teaching.org" -k 30142 ws://localhost:3334
+
+# Multiple filters with text search
+nak req --search "bildung learningResourceType.prefLabel.de:Video publisher.name:test" -k 30142 ws://localhost:3334
+```
+
+### Multiple Values for Same Field
+
+Multiple values for the same base field are combined with OR logic:
+
+```bash
+# Find resources about Mathematics OR Physics
+nak req --search "about.prefLabel.de:Mathematik about.prefLabel.de:Physik" -k 30142 ws://localhost:3334
+```
+
+### Supported Filter Fields
+
+| Field Path | Description | Example |
+|------------|-------------|---------|
+| `publisher.name` | Publisher organization name | `publisher.name:e-teaching.org` |
+| `creator.name` | Content creator name | `creator.name:John` |
+| `about.prefLabel.de` | Subject/topic (German) | `about.prefLabel.de:Mathematik` |
+| `about.prefLabel.en` | Subject/topic (English) | `about.prefLabel.en:Mathematics` |
+| `learningResourceType.prefLabel.de` | Resource type (German) | `learningResourceType.prefLabel.de:Video` |
+| `audience.prefLabel.de` | Target audience (German) | `audience.prefLabel.de:Lehrkräfte` |
+| `educationalLevel.prefLabel.de` | Educational level (German) | `educationalLevel.prefLabel.de:Sekundarstufe` |
+
+Any nested field path supported by the Typesense schema can be used for filtering.
+
+## Usage Example
 
 ```go
 package main

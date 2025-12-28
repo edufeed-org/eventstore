@@ -104,3 +104,156 @@ func TestSearchResourcesWithLimitHandlesEmptySearch(t *testing.T) {
 		t.Errorf("Expected wildcard query '*', got: %s", mainQuery)
 	}
 }
+
+func TestParseSearchQueryFieldFilters(t *testing.T) {
+	tests := []struct {
+		name           string
+		searchStr      string
+		expectedTerms  []string
+		expectedFields map[string][]string
+	}{
+		{
+			name:           "Simple field filter with dot notation",
+			searchStr:      "publisher.name:e-teaching.org",
+			expectedTerms:  []string{},
+			expectedFields: map[string][]string{"publisher.name": {"e-teaching.org"}},
+		},
+		{
+			name:           "Deeply nested field filter",
+			searchStr:      "learningResourceType.prefLabel.de:Video",
+			expectedTerms:  []string{},
+			expectedFields: map[string][]string{"learningResourceType.prefLabel.de": {"Video"}},
+		},
+		{
+			name:           "Field filter with free text",
+			searchStr:      "forschung publisher.name:e-teaching.org",
+			expectedTerms:  []string{"forschung"},
+			expectedFields: map[string][]string{"publisher.name": {"e-teaching.org"}},
+		},
+		{
+			name:           "Multiple field filters same base field",
+			searchStr:      "about.prefLabel.de:Mathematik about.prefLabel.de:Physik",
+			expectedTerms:  []string{},
+			expectedFields: map[string][]string{"about.prefLabel.de": {"Mathematik", "Physik"}},
+		},
+		{
+			name:           "Multiple field filters different base fields",
+			searchStr:      "publisher.name:test learningResourceType.prefLabel.de:Video",
+			expectedTerms:  []string{},
+			expectedFields: map[string][]string{"publisher.name": {"test"}, "learningResourceType.prefLabel.de": {"Video"}},
+		},
+		{
+			name:           "Combined text and multiple filters",
+			searchStr:      "mathematik bildung publisher.name:e-teaching.org about.prefLabel.de:Schule",
+			expectedTerms:  []string{"mathematik", "bildung"},
+			expectedFields: map[string][]string{"publisher.name": {"e-teaching.org"}, "about.prefLabel.de": {"Schule"}},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			query := ParseSearchQuery(tt.searchStr)
+
+			// Check raw terms
+			if len(query.RawTerms) != len(tt.expectedTerms) {
+				t.Errorf("Expected %d raw terms, got %d: %v", len(tt.expectedTerms), len(query.RawTerms), query.RawTerms)
+			}
+			for i, term := range tt.expectedTerms {
+				if i < len(query.RawTerms) && query.RawTerms[i] != term {
+					t.Errorf("Expected raw term %d to be %s, got %s", i, term, query.RawTerms[i])
+				}
+			}
+
+			// Check field filters
+			if len(query.FieldFilters) != len(tt.expectedFields) {
+				t.Errorf("Expected %d field filters, got %d: %v", len(tt.expectedFields), len(query.FieldFilters), query.FieldFilters)
+			}
+			for field, expectedValues := range tt.expectedFields {
+				if actualValues, ok := query.FieldFilters[field]; ok {
+					if len(actualValues) != len(expectedValues) {
+						t.Errorf("Expected %d values for field %s, got %d", len(expectedValues), field, len(actualValues))
+					}
+					for i, expectedVal := range expectedValues {
+						if i < len(actualValues) && actualValues[i] != expectedVal {
+							t.Errorf("Expected value %d for field %s to be %s, got %s", i, field, expectedVal, actualValues[i])
+						}
+					}
+				} else {
+					t.Errorf("Expected field %s not found in filters", field)
+				}
+			}
+		})
+	}
+}
+
+func TestBuildTypesenseQueryWithFieldFilters(t *testing.T) {
+	tests := []struct {
+		name               string
+		searchStr          string
+		expectedMainQuery  string
+		expectedFilterPart string
+	}{
+		{
+			name:               "Simple nested field filter",
+			searchStr:          "publisher.name:e-teaching.org",
+			expectedMainQuery:  "",
+			expectedFilterPart: "publisher.name:=`e-teaching.org`",
+		},
+		{
+			name:               "Deeply nested field filter",
+			searchStr:          "learningResourceType.prefLabel.de:Video",
+			expectedMainQuery:  "",
+			expectedFilterPart: "learningResourceType.prefLabel.de:=`Video`",
+		},
+		{
+			name:               "Text with field filter",
+			searchStr:          "forschung publisher.name:test",
+			expectedMainQuery:  "forschung",
+			expectedFilterPart: "publisher.name:=`test`",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			query := ParseSearchQuery(tt.searchStr)
+			mainQuery, params, err := BuildTypesenseQuery(query)
+
+			if err != nil {
+				t.Errorf("BuildTypesenseQuery failed: %v", err)
+			}
+
+			if mainQuery != tt.expectedMainQuery {
+				t.Errorf("Expected main query '%s', got '%s'", tt.expectedMainQuery, mainQuery)
+			}
+
+			filterBy, hasFilter := params["filter_by"]
+			if tt.expectedFilterPart != "" {
+				if !hasFilter {
+					t.Errorf("Expected filter_by parameter but none found")
+				} else if filterBy != tt.expectedFilterPart {
+					t.Errorf("Expected filter_by '%s', got '%s'", tt.expectedFilterPart, filterBy)
+				}
+			}
+		})
+	}
+}
+
+func TestBuildTypesenseQueryMultipleFilters(t *testing.T) {
+	// Test that multiple filters on same base field are joined with OR
+	query := ParseSearchQuery("about.prefLabel.de:Mathematik about.prefLabel.de:Physik")
+	_, params, err := BuildTypesenseQuery(query)
+
+	if err != nil {
+		t.Errorf("BuildTypesenseQuery failed: %v", err)
+	}
+
+	filterBy, hasFilter := params["filter_by"]
+	if !hasFilter {
+		t.Errorf("Expected filter_by parameter but none found")
+	}
+
+	// Should contain both filters joined with OR
+	if filterBy != "(about.prefLabel.de:=`Mathematik` || about.prefLabel.de:=`Physik`)" {
+		t.Errorf("Expected OR-joined filter, got: %s", filterBy)
+	}
+}

@@ -273,8 +273,9 @@ func BuildTypesenseQuery(query SearchQuery) (string, map[string]string, error) {
 		}
 
 		for _, value := range values {
-			// Create the filter expression
-			filterExpr := fmt.Sprintf("%s:%s", field, value)
+			// Create the filter expression using := for exact string matching in Typesense
+			// Wrap value in backticks to handle special characters
+			filterExpr := fmt.Sprintf("%s:=`%s`", field, value)
 
 			// Add to the corresponding field group
 			fieldGroups[baseName] = append(fieldGroups[baseName], filterExpr)
